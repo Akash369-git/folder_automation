@@ -1,0 +1,52 @@
+$sourceFolder = "C:\path\to\source\folder"
+$destinationFolder = "C:\path\to\destination\folder"
+
+# Function to recursively copy folders and files
+function Copy-FolderRecursively {
+    param(
+        [string]$SourcePath,
+        [string]$DestinationPath
+    )
+
+    # Create the destination folder if it doesn't exist
+    if (-not (Test-Path -Path $DestinationPath)) {
+        New-Item -ItemType Directory -Path $DestinationPath -Force | Out-Null
+    }
+
+    # Get the list of folders and files in the source folder
+    $items = Get-ChildItem -Path $SourcePath
+
+    foreach ($item in $items) {
+        $destinationItem = Join-Path -Path $DestinationPath -ChildPath $item.Name
+
+        if ($item.PSIsContainer) {
+            # Recursively copy subfolder
+            Copy-FolderRecursively -SourcePath $item.FullName -DestinationPath $destinationItem
+        }
+        else {
+            # Copy file
+            Copy-Item -Path $item.FullName -Destination $destinationItem -Force
+        }
+    }
+
+    # Create .gitignore file
+    $gitignorePath = Join-Path -Path $DestinationPath -ChildPath ".gitignore"
+    Set-Content -Path $gitignorePath -Value "# Ignore everything in this directory`n*`n# Except this file`n!.gitignore"
+}
+
+# Get the list of folders in the source folder
+$sourceFolders = Get-ChildItem -Path $sourceFolder -Directory -Recurse | Select-Object -ExpandProperty FullName
+
+# Compare and copy missing folders
+foreach ($folder in $sourceFolders) {
+    $relativePath = $folder -replace [regex]::Escape($sourceFolder), ""
+    $destinationPath = Join-Path -Path $destinationFolder -ChildPath $relativePath
+
+    if (-not (Test-Path -Path $destinationPath)) {
+        # Copy missing folder and its contents recursively
+        Copy-FolderRecursively -SourcePath $folder -DestinationPath $destinationPath
+        Write-Host "Copied folder: $relativePath"
+    }
+}
+
+Write-Host "Folder comparison and copy completed."
